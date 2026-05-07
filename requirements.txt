@@ -1,0 +1,22 @@
+# Vehicle Detection - Python Dependencies
+#
+# Installation order matters:
+#
+# Step 1 - PyTorch CPU (run this separately):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#
+# Step 2 - Everything else:
+#   pip install -r requirements.txt
+
+ultralytics>=8.0.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+requests>=2.31.0
+tqdm>=4.65.0
+PyYAML>=6.0
+pydantic>=2.0.0
+imageio-ffmpeg>=0.4.0

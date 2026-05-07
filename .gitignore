@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+dataset/images/
+dataset/labels/
+static/outputs/
+runs/
+*.mp4
+*.avi

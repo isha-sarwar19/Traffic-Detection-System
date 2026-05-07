@@ -1,0 +1,2070 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>VehicleEye — YOLOv8 Detection</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #080b10;
+        --surf: rgba(20, 24, 34, 0.4);
+        --surf2: rgba(30, 36, 50, 0.6);
+        --border: rgba(0, 229, 160, 0.15);
+        --border2: rgba(0, 229, 160, 0.3);
+        --border-glow: rgba(0, 229, 160, 0.5);
+        --accent: #00e5a0;
+        --accent-glow: rgba(0, 229, 160, 0.6);
+        --accent-alt: #00d2ff;
+        --warn: #ffcc00;
+        --danger: #ff3b5c;
+        --text: #f8fafc;
+        --muted: #64748b;
+        --muted2: #94a3b8;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "JetBrains Mono", monospace;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(
+            circle at 15% 50%,
+            rgba(0, 229, 160, 0.03) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 85% 30%,
+            rgba(0, 210, 255, 0.03) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
+        z-index: 0;
+      }
+      .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1400px;
+        width: 95%;
+        margin: 0 auto;
+        padding: 0 16px;
+      }
+      /* Typography */
+      h1,
+      h2,
+      h3,
+      .syne {
+        font-family: "Syne", sans-serif;
+      }
+
+      /* Header */
+      header {
+        padding: 32px 0 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 40px;
+      }
+      .logo {
+        width: 54px;
+        height: 54px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 26px;
+        box-shadow: 0 0 30px var(--accent-glow);
+      }
+      .logo-text h1 {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        background: -webkit-linear-gradient(#fff, #cbd5e1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .logo-text p {
+        font-size: 11px;
+        color: var(--accent);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-top: 4px;
+        font-weight: 500;
+      }
+
+      /* Tabs */
+      .tabs {
+        display: inline-flex;
+        gap: 8px;
+        margin-bottom: 32px;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 6px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+      }
+      .tab {
+        padding: 10px 24px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: var(--muted2);
+        font-family: "Syne", sans-serif;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .tab.on {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--accent);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .tab:hover:not(.on) {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      /* Cards (Glassmorphism) */
+      .card {
+        background: var(--surf);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      }
+      .card + .card {
+        margin-top: 24px;
+      }
+      .ch {
+        padding: 20px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .ch h2 {
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--text);
+      }
+      .badge {
+        margin-left: auto;
+        font-size: 10px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: rgba(0, 229, 160, 0.1);
+        color: var(--accent);
+        border: 1px solid var(--border);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 24px;
+        align-items: start;
+      }
+      @media (max-width: 992px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Upload Zone */
+      .drop {
+        margin: 24px;
+        border: 2px dashed rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 48px 24px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .drop:hover,
+      .drop.over {
+        border-color: var(--accent);
+        background: linear-gradient(
+          180deg,
+          rgba(0, 229, 160, 0.05) 0%,
+          rgba(0, 229, 160, 0.01) 100%
+        );
+        animation: pulse-border 2s infinite;
+      }
+      @keyframes pulse-border {
+        0%,
+        100% {
+          border-color: var(--accent);
+        }
+        50% {
+          border-color: rgba(0, 229, 160, 0.3);
+        }
+      }
+      .drop input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+      .di {
+        font-size: 42px;
+        margin-bottom: 16px;
+        display: block;
+        filter: drop-shadow(0 0 10px rgba(0, 229, 160, 0.3));
+      }
+      .drop h3 {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--text);
+      }
+      .drop p {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      /* Previews */
+      .preview {
+        margin: 0 24px 24px;
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #000;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+      .preview img {
+        width: 100%;
+        display: none;
+      }
+      .itag,
+      .rtag {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        font-size: 10px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        z-index: 2;
+      }
+      .itag {
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text);
+      }
+      .rtag {
+        background: rgba(0, 229, 160, 0.15);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+        box-shadow: 0 0 15px rgba(0, 229, 160, 0.4);
+      }
+
+      /* Controls */
+      .ctrls {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .ctrl label {
+        display: block;
+        font-size: 11px;
+        color: var(--muted2);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+      }
+      .sr {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      input[type="range"] {
+        flex: 1;
+        -webkit-appearance: none;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        box-shadow: 0 0 12px var(--accent-glow);
+        transition: transform 0.2s;
+      }
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+      }
+      .sv {
+        font-size: 13px;
+        color: var(--accent);
+        font-weight: 600;
+        min-width: 40px;
+        text-align: right;
+      }
+
+      /* Buttons */
+      .btn {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, var(--accent), #00b37c);
+        color: #000;
+        border: none;
+        border-radius: 12px;
+        font-family: "Syne", sans-serif;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 4px 15px rgba(0, 229, 160, 0.3);
+      }
+      .btn:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 12px 25px rgba(0, 229, 160, 0.5);
+      }
+      .btn:active {
+        transform: translateY(0) scale(0.98);
+      }
+      .btn:disabled {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.3);
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+      }
+
+      /* Spinners */
+      .spin-wrap,
+      .vspin-overlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 11, 16, 0.85);
+        backdrop-filter: blur(8px);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        border-radius: 12px;
+      }
+      .spin-wrap.show,
+      .vspin-overlay.show {
+        display: flex;
+      }
+      .sp {
+        width: 44px;
+        height: 44px;
+        border: 3px solid rgba(0, 229, 160, 0.1);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s bezier(0.4, 0, 0.2, 1) infinite;
+        box-shadow: 0 0 20px rgba(0, 229, 160, 0.2);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .sl {
+        font-size: 12px;
+        color: var(--accent);
+        letter-spacing: 2px;
+        margin-top: 16px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        text-shadow: 0 0 10px rgba(0, 229, 160, 0.5);
+      }
+      .vspin-overlay {
+        position: relative;
+        padding: 60px 24px;
+        border-radius: 0;
+      }
+      .vspin-bar {
+        width: 100%;
+        max-width: 300px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 24px auto 16px;
+      }
+      .vspin-fill {
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--accent),
+          transparent
+        );
+        animation: indeterminate 1.5s ease-in-out infinite;
+      }
+      @keyframes indeterminate {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      /* Stat Cards (Grid) */
+      .sb {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .sg {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .sc,
+      .vstat-card {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.03) 0%,
+          rgba(255, 255, 255, 0.01) 100%
+        );
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 16px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.3s;
+      }
+      .sc::before,
+      .vstat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 20%;
+        width: 60%;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--accent),
+          transparent
+        );
+        opacity: 0.5;
+      }
+      .sc:hover,
+      .vstat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        border-color: rgba(0, 229, 160, 0.3);
+      }
+      .v {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 32px;
+        font-weight: 600;
+        color: var(--accent);
+        text-shadow: 0 0 20px rgba(0, 229, 160, 0.4);
+        line-height: 1.2;
+      }
+      .l {
+        font-size: 10px;
+        color: var(--muted2);
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        margin-top: 4px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+      }
+      .sub {
+        font-size: 9px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+
+      /* Vehicle Dist Bars */
+      .bl {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .br {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+      .bn {
+        font-size: 11px;
+        color: var(--text);
+        min-width: 90px;
+        font-weight: 500;
+        font-family: "Syne", sans-serif;
+      }
+      .bb {
+        flex: 1;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+      }
+      .bf {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+        box-shadow: 0 0 10px currentColor;
+      }
+      .bv {
+        font-size: 11px;
+        color: var(--text);
+        font-weight: 600;
+        min-width: 24px;
+        text-align: right;
+      }
+
+      /* Detections List */
+      .dl {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 0 24px 24px;
+      }
+      .di2 {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        font-size: 11px;
+        transition: all 0.2s;
+      }
+      .di2:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+        transform: translateX(4px);
+      }
+      .dd {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        box-shadow: 0 0 8px currentColor;
+      }
+      .dn {
+        flex: 1;
+        font-weight: 600;
+        font-family: "Syne", sans-serif;
+        font-size: 13px;
+      }
+      .dp {
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .dc {
+        font-size: 10px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.4);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      /* Empty State */
+      .empty {
+        padding: 48px 24px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 2;
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+      }
+      .empty span {
+        font-size: 36px;
+        display: block;
+        margin-bottom: 12px;
+        opacity: 0.5;
+        filter: grayscale(1);
+        transition: 0.3s;
+      }
+      .empty:hover span {
+        filter: grayscale(0);
+        opacity: 1;
+        transform: scale(1.1);
+      }
+
+      /* Video Analytics */
+      #vdashboard > div {
+        animation: slideUpFade 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      #vdashboard > div:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+      #vdashboard > div:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+      #vdashboard > div:nth-child(4) {
+        animation-delay: 0.3s;
+      }
+      #vdashboard > div:nth-child(5) {
+        animation-delay: 0.4s;
+      }
+      @keyframes slideUpFade {
+        from {
+          opacity: 0;
+          transform: translateY(30px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .dash-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-top: 24px;
+      }
+      @media (max-width: 992px) {
+        .dash-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .dash-card {
+        background: var(--surf);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+      }
+      .dash-card .ch {
+        padding: 18px 24px;
+      }
+      .dash-body {
+        padding: 24px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .chart-wrap {
+        position: relative;
+        width: 100%;
+        height: 260px;
+        margin-bottom: 16px;
+      }
+      .dash-full {
+        grid-column: 1/-1;
+      }
+
+      /* Video Player */
+      #vplayer-card {
+        padding: 32px;
+        background: #000;
+        position: relative;
+        border: 1px solid rgba(0, 229, 160, 0.2);
+      }
+      #vplayer-card .ch {
+        padding: 0 0 20px 0;
+        border: none;
+      }
+      video {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+        outline: none;
+      }
+
+      /* Peak Card (Busiest Moment) */
+      .peak-card {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 59, 92, 0.1) 0%,
+          rgba(204, 46, 73, 0.3) 100%
+        );
+        border: 2px solid rgba(255, 59, 92, 0.5);
+        border-radius: 16px;
+        padding: 32px 24px;
+        text-align: center;
+        box-shadow:
+          0 0 30px rgba(255, 59, 92, 0.2),
+          inset 0 0 20px rgba(255, 255, 255, 0.05);
+        position: relative;
+        overflow: hidden;
+      }
+      .peak-val {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 56px;
+        font-weight: 800;
+        color: #ff3b5c;
+        line-height: 1;
+        text-shadow: 0 0 20px rgba(255, 59, 92, 0.6);
+        margin-bottom: 8px;
+      }
+      .peak-sub {
+        font-size: 12px;
+        color: var(--text);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+      .peak-time {
+        font-size: 13px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.4);
+        padding: 8px 16px;
+        border-radius: 8px;
+        display: inline-block;
+        font-weight: 500;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      /* Congestion Badges */
+      .cong-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        font-family: "Syne", sans-serif;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      .cong-LOW {
+        background: rgba(0, 229, 160, 0.15);
+        color: #00e5a0;
+        border: 1px solid rgba(0, 229, 160, 0.4);
+        text-shadow: 0 0 10px rgba(0, 229, 160, 0.5);
+        box-shadow: 0 0 15px rgba(0, 229, 160, 0.2);
+      }
+      .cong-MODERATE {
+        background: rgba(255, 204, 0, 0.15);
+        color: #ffcc00;
+        border: 1px solid rgba(255, 204, 0, 0.4);
+        text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        box-shadow: 0 0 15px rgba(255, 204, 0, 0.2);
+      }
+      .cong-HIGH {
+        background: rgba(255, 59, 92, 0.15);
+        color: #ff3b5c;
+        border: 1px solid rgba(255, 59, 92, 0.4);
+        text-shadow: 0 0 10px rgba(255, 59, 92, 0.5);
+        box-shadow: 0 0 20px rgba(255, 59, 92, 0.4);
+        animation: pulse-red 2s infinite;
+      }
+      @keyframes pulse-red {
+        0%,
+        100% {
+          box-shadow: 0 0 10px rgba(255, 59, 92, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(255, 59, 92, 0.6);
+        }
+      }
+
+      /* Congestion Timeline */
+      .tl-bar {
+        display: flex;
+        border-radius: 12px;
+        overflow: hidden;
+        height: 40px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5);
+      }
+      .tl-seg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        font-family: "Syne", sans-serif;
+        transition: all 0.3s;
+        color: rgba(0, 0, 0, 0.7);
+        overflow: hidden;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .tl-seg:last-child {
+        border-right: none;
+      }
+      .tl-seg.LOW {
+        background: linear-gradient(180deg, #00e5a0, #00996b);
+      }
+      .tl-seg.MODERATE {
+        background: linear-gradient(180deg, #ffcc00, #b38f00);
+      }
+      .tl-seg.HIGH {
+        background: linear-gradient(180deg, #ff3b5c, #b32940);
+      }
+      .tl-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-top: 12px;
+      }
+      .tl-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 6px 14px;
+        border-radius: 100px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+      }
+      .tl-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        box-shadow: 0 0 10px currentColor;
+      }
+
+      /* Report Summary */
+      .report-card {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 160, 0.1),
+          rgba(0, 210, 255, 0.05)
+        );
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(0, 229, 160, 0.3);
+        border-radius: 20px;
+        padding: 32px;
+        margin-top: 24px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+      }
+      .report-title {
+        font-family: "Syne", sans-serif;
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--accent);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-shadow: 0 0 15px rgba(0, 229, 160, 0.4);
+      }
+      .report-text {
+        font-size: 14px;
+        line-height: 2.2;
+        color: var(--text);
+        font-family: "Syne", sans-serif;
+        font-weight: 500;
+      }
+      .report-text strong {
+        color: #fff;
+        font-weight: 800;
+        font-size: 15px;
+      }
+      .report-text .highlight {
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      }
+      .report-text .hl-green {
+        background: rgba(0, 229, 160, 0.2);
+        color: #00e5a0;
+        border: 1px solid rgba(0, 229, 160, 0.4);
+      }
+      .report-text .hl-orange {
+        background: rgba(255, 204, 0, 0.2);
+        color: #ffcc00;
+        border: 1px solid rgba(255, 204, 0, 0.4);
+      }
+      .report-text .hl-red {
+        background: rgba(255, 59, 92, 0.2);
+        color: #ff3b5c;
+        border: 1px solid rgba(255, 59, 92, 0.4);
+      }
+
+      /* Section Info */
+      .section-desc {
+        font-size: 11px;
+        color: var(--muted2);
+        line-height: 1.7;
+        margin-top: auto;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .section-desc em {
+        color: var(--text);
+        font-style: normal;
+        font-weight: 600;
+      }
+
+      /* Congestion legend box */
+      .cong-legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+        padding: 16px 20px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+      }
+      .cong-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 11px;
+        color: var(--text);
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+      }
+      .cong-legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        box-shadow: 0 0 10px currentColor;
+      }
+
+      /* Stats row for video */
+      .vstats-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-top: 24px;
+      }
+      @media (max-width: 992px) {
+        .vstats-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      /* API */
+      .ab {
+        padding: 24px;
+        font-size: 12px;
+        line-height: 1.8;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .ablock {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .am {
+        color: var(--accent-alt);
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: 14px;
+        margin-bottom: 8px;
+        letter-spacing: 1px;
+      }
+      .ad {
+        color: var(--muted2);
+        margin-bottom: 12px;
+        font-size: 11px;
+        font-family: "Syne", sans-serif;
+      }
+      pre {
+        background: #000;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 11px;
+        overflow-x: auto;
+        color: #fff;
+        line-height: 1.6;
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        padding: 16px 24px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        z-index: 1000;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border: 1px solid;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      }
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .toast.ok {
+        background: rgba(0, 229, 160, 0.15);
+        border-color: var(--accent);
+        color: var(--accent);
+        backdrop-filter: blur(10px);
+      }
+      .toast.err {
+        background: rgba(255, 59, 92, 0.15);
+        border-color: var(--danger);
+        color: var(--danger);
+        backdrop-filter: blur(10px);
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent);
+      }
+      ::-webkit-scrollbar-corner {
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="logo">🚗</div>
+        <div class="logo-text">
+          <h1>VehicleEye</h1>
+          <p>YOLOv8 Analysis</p>
+        </div>
+        <div class="pill" id="pill" style="display: none">
+          <span class="dot"></span><span id="ptxt">Checking…</span>
+        </div>
+      </header>
+
+      <div class="tabs">
+        <button class="tab on" onclick="switchTab('image', this)">
+          📷 Image
+        </button>
+        <button class="tab" onclick="switchTab('video', this)">🎬 Video</button>
+        <button class="tab" onclick="switchTab('api', this)">⚡ API</button>
+      </div>
+
+      <!-- IMAGE TAB -->
+      <div id="tab-image">
+        <div class="grid">
+          <div>
+            <div class="card">
+              <div class="ch">
+                <span style="font-size: 20px">📁</span>
+                <h2>Upload Image</h2>
+                <span class="badge">JPG · PNG</span>
+              </div>
+              <div class="drop" id="drop">
+                <input
+                  type="file"
+                  id="fin"
+                  accept="image/*"
+                  onchange="onFile(event)"
+                />
+                <span class="di">⬆</span>
+                <h3>Drag & Drop image here</h3>
+                <p>or click to browse — JPG, PNG, WEBP</p>
+              </div>
+              <div class="preview" id="prewrap" style="display: none">
+                <img id="preimg" alt="preview" />
+                <span class="itag">INPUT IMAGE</span>
+              </div>
+            </div>
+
+            <div class="card" id="rescard" style="display: none">
+              <div class="ch">
+                <span style="font-size: 20px">🎯</span>
+                <h2>Detection Result</h2>
+                <span class="badge rtag">ANNOTATED</span>
+              </div>
+              <div class="preview" style="margin: 24px">
+                <div class="spin-wrap" id="spin">
+                  <div class="sp"></div>
+                  <span class="sl">SCANNING IMAGE…</span>
+                </div>
+                <img id="resimg" alt="result" style="display: block" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <div class="ch">
+                <span style="font-size: 20px">⚙️</span>
+                <h2>Detection Settings</h2>
+              </div>
+              <div class="ctrls">
+                <div class="ctrl">
+                  <label>Confidence Threshold</label>
+                  <div class="sr">
+                    <input
+                      type="range"
+                      id="conf"
+                      min="10"
+                      max="95"
+                      value="40"
+                      oninput="
+                        document.getElementById('cv').textContent = (
+                          this.value / 100
+                        ).toFixed(2)
+                      "
+                    />
+                    <span class="sv" id="cv">0.40</span>
+                  </div>
+                </div>
+                <button class="btn" id="gobtn" onclick="doDetect()" disabled>
+                  <span>🔍</span> DETECT VEHICLES
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="ch">
+                <span style="font-size: 20px">📊</span>
+                <h2>Statistics Results</h2>
+              </div>
+              <div class="sb" id="stats">
+                <div class="empty">
+                  <span>📡</span>Upload an image and run detection
+                </div>
+              </div>
+            </div>
+
+            <div class="card" id="detcard" style="display: none">
+              <div class="ch">
+                <span style="font-size: 20px">📋</span>
+                <h2>Found Objects</h2>
+                <span
+                  class="badge"
+                  id="detbadge"
+                  style="background: var(--accent); color: #000"
+                  >0</span
+                >
+              </div>
+              <div class="dl" id="detlist"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIDEO TAB -->
+      <div id="tab-video" style="display: none">
+        <div class="card">
+          <div class="ch">
+            <span style="font-size: 20px">🎬</span>
+            <h2>Video Traffic Analysis</h2>
+            <span class="badge">MP4 · AVI · MOV</span>
+          </div>
+          <div class="drop" id="vdrop">
+            <input
+              type="file"
+              id="vin"
+              accept="video/*"
+              onchange="onVideo(event)"
+            />
+            <span class="di">🎥</span>
+            <h3>Drag & Drop video here</h3>
+            <p>MP4, AVI, MOV — Max 50MB</p>
+          </div>
+          <div class="ctrls">
+            <div class="ctrl">
+              <label>Max Frames to Analyze (CPU Limit)</label>
+              <div class="sr">
+                <input
+                  type="range"
+                  id="fslide"
+                  min="30"
+                  max="300"
+                  value="150"
+                  oninput="
+                    document.getElementById('fv').textContent = this.value
+                  "
+                />
+                <span class="sv" id="fv">150</span>
+              </div>
+            </div>
+            <button class="btn" id="vbtn" onclick="doVideo()" disabled>
+              <span>▶</span> PROCESS VIDEO ANALYTICS
+            </button>
+          </div>
+
+          <div class="vspin-overlay" id="vspin">
+            <div class="sp" style="margin: 0 auto"></div>
+            <div
+              style="
+                font-size: 14px;
+                font-weight: 800;
+                font-family: &quot;Syne&quot;, sans-serif;
+                color: var(--accent);
+                letter-spacing: 2px;
+                margin-top: 20px;
+              "
+            >
+              ANALYZING TRAFFIC DATA…
+            </div>
+            <div class="vspin-bar"><div class="vspin-fill"></div></div>
+            <div
+              style="
+                font-size: 11px;
+                color: var(--muted2);
+                font-family: &quot;JetBrains Mono&quot;, monospace;
+              "
+            >
+              This may take a moment depending on video length and CPU speed
+            </div>
+          </div>
+        </div>
+
+        <div id="vdashboard" style="display: none">
+          <div class="report-card" id="report-card"></div>
+
+          <div
+            class="dash-card"
+            id="vplayer-card"
+            style="display: none; margin-top: 24px"
+          >
+            <div class="ch" style="border-bottom: none; width: 100%">
+              <span style="font-size: 20px">📺</span>
+              <h2>Detection Playback</h2>
+              <span
+                class="badge"
+                style="
+                  background: rgba(0, 229, 160, 0.15);
+                  color: #00e5a0;
+                  border-color: rgba(0, 229, 160, 0.3);
+                "
+                >ANNOTATED</span
+              >
+            </div>
+            <video id="vplayer" controls autoplay muted loop></video>
+            <div class="section-desc">
+              📌 Original video processed frame-by-frame. Play, pause, and seek
+              below. Use the button to download.
+            </div>
+          </div>
+
+          <div>
+            <div class="vstats-row" id="vstats-row"></div>
+          </div>
+
+          <div
+            style="
+              margin-top: 24px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              flex-wrap: wrap;
+              gap: 16px;
+            "
+            id="vdl-row"
+          >
+            <a
+              id="vdl"
+              href="#"
+              target="_blank"
+              style="
+                display: none;
+                color: #000;
+                font-weight: 800;
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-size: 12px;
+                background: var(--accent);
+                text-decoration: none;
+                padding: 12px 24px;
+                border-radius: 10px;
+                box-shadow: 0 4px 15px rgba(0, 229, 160, 0.3);
+                transition: transform 0.3s;
+              "
+              >⬇ DOWNLOAD ANNOTATED VIDEO</a
+            >
+            <span id="overall-badge"></span>
+          </div>
+
+          <div class="cong-legend">
+            <div class="cong-legend-item">
+              <div
+                class="cong-legend-dot"
+                style="background: #00e5a0; color: #00e5a0"
+              ></div>
+              LOW — Less than 10 vehicles
+            </div>
+            <div class="cong-legend-item">
+              <div
+                class="cong-legend-dot"
+                style="background: #ffcc00; color: #ffcc00"
+              ></div>
+              MODERATE — 10 to 19 vehicles
+            </div>
+            <div class="cong-legend-item">
+              <div
+                class="cong-legend-dot"
+                style="background: #ff3b5c; color: #ff3b5c"
+              ></div>
+              HIGH — 20+ vehicles
+            </div>
+          </div>
+
+          <div class="dash-grid">
+            <div class="dash-card dash-full">
+              <div class="ch">
+                <span style="font-size: 20px">📈</span>
+                <h2>Traffic Flow Over Time</h2>
+                <span
+                  class="badge"
+                  style="
+                    background: rgba(0, 210, 255, 0.15);
+                    color: var(--accent-alt);
+                    border-color: rgba(0, 210, 255, 0.3);
+                  "
+                  >LIVE GRAPH</span
+                >
+              </div>
+              <div class="dash-body">
+                <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+                <div class="section-desc">
+                  📌 Shows <em>how many vehicles detected</em> in each frame
+                  over time.
+                  <span style="color: #ffcc00">Yellow dashed line</span> marks
+                  MODERATE (10+ vehicles).
+                  <span style="color: #ff3b5c">Red dashed line</span> marks HIGH
+                  congestion (20+ vehicles).
+                </div>
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <div class="ch">
+                <span style="font-size: 20px">📊</span>
+                <h2>Vehicle Distribution</h2>
+              </div>
+              <div class="dash-body">
+                <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+                <div class="section-desc">
+                  📌 The <em>total count of each vehicle type</em> detected
+                  across all frames.
+                </div>
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <div class="ch">
+                <span style="font-size: 20px">🔺</span>
+                <h2>Peak Traffic Moment</h2>
+              </div>
+              <div
+                class="dash-body"
+                id="peak-body"
+                style="justify-content: center"
+              ></div>
+            </div>
+
+            <div class="dash-card dash-full">
+              <div class="ch">
+                <span style="font-size: 20px">🚦</span>
+                <h2>Congestion Timeline</h2>
+                <span
+                  class="badge"
+                  style="
+                    background: rgba(255, 204, 0, 0.15);
+                    color: #ffcc00;
+                    border-color: rgba(255, 204, 0, 0.4);
+                  "
+                  >DYNAMICS</span
+                >
+              </div>
+              <div class="dash-body" id="timeline-body"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API TAB -->
+      <div id="tab-api" style="display: none">
+        <div class="card">
+          <div class="ch">
+            <span style="font-size: 20px">⚡</span>
+            <h2>API Reference</h2>
+            <span class="badge">REST JSON</span>
+          </div>
+          <div class="ab">
+            <p
+              style="
+                color: var(--text);
+                margin-bottom: 24px;
+                font-weight: 600;
+                font-size: 13px;
+              "
+            >
+              Base URL:
+              <code
+                style="
+                  color: var(--accent);
+                  background: rgba(0, 229, 160, 0.1);
+                  padding: 4px 8px;
+                  border-radius: 6px;
+                "
+                >http://localhost:8000</code
+              >
+            </p>
+            <div class="ablock">
+              <div class="am">POST /detect/image</div>
+              <div class="ad">
+                Upload image → JSON detections + annotated image (base64)
+              </div>
+              <pre>
+curl -X POST "http://localhost:8000/detect/image" \
+  -F "file=@traffic.jpg" \
+  -F "confidence=0.4"</pre
+              >
+            </div>
+            <div class="ablock">
+              <div class="am">POST /detect/video</div>
+              <div class="ad">
+                Upload video → annotated video file + statistics
+              </div>
+              <pre>
+curl -X POST "http://localhost:8000/detect/video" \
+  -F "file=@traffic.mp4" \
+  -F "max_frames=150"</pre
+              >
+            </div>
+            <div class="ablock">
+              <div class="am">GET /docs</div>
+              <div class="ad">Interactive Swagger API Console</div>
+              <a
+                href="/docs"
+                style="
+                  color: var(--accent);
+                  text-decoration: none;
+                  font-weight: 700;
+                "
+                >Open Swagger UI →</a
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      const COLORS = {
+        car: "#56b4e9",
+        truck: "#e69f00",
+        bus: "#009e73",
+        motorcycle: "#0072b2",
+        bicycle: "#f0e442",
+      };
+
+      // Health check
+      (async () => {
+        try {
+          const r = await fetch("/health");
+          if (r.ok) {
+            document.getElementById("pill").classList.add("live");
+            document.getElementById("ptxt").textContent = "API Online";
+          }
+        } catch {
+          document.getElementById("ptxt").textContent = "Offline";
+        }
+      })();
+
+      // Tab switching
+      function switchTab(name, el) {
+        ["image", "video", "api"].forEach(
+          (t) => (document.getElementById("tab-" + t).style.display = "none"),
+        );
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("on"));
+        document.getElementById("tab-" + name).style.display = "block";
+        el.classList.add("on");
+      }
+
+      // Drag & drop
+      const drop = document.getElementById("drop");
+      ["dragenter", "dragover"].forEach((e) =>
+        drop.addEventListener(e, (ev) => {
+          ev.preventDefault();
+          drop.classList.add("over");
+        }),
+      );
+      ["dragleave", "drop"].forEach((e) =>
+        drop.addEventListener(e, (ev) => {
+          ev.preventDefault();
+          drop.classList.remove("over");
+        }),
+      );
+      drop.addEventListener("drop", (ev) => {
+        const f = ev.dataTransfer.files[0];
+        if (f) loadPreview(f);
+      });
+
+      let curFile = null;
+      function onFile(e) {
+        const f = e.target.files[0];
+        if (f) loadPreview(f);
+      }
+
+      function loadPreview(f) {
+        curFile = f;
+        const r = new FileReader();
+        r.onload = (e) => {
+          document.getElementById("preimg").src = e.target.result;
+          document.getElementById("preimg").style.display = "block";
+          document.getElementById("prewrap").style.display = "block";
+          document.getElementById("rescard").style.display = "none";
+          document.getElementById("gobtn").disabled = false;
+        };
+        r.readAsDataURL(f);
+      }
+
+      async function doDetect() {
+        if (!curFile) return;
+        const conf = document.getElementById("conf").value / 100;
+        const btn = document.getElementById("gobtn");
+        btn.disabled = true;
+        btn.textContent = "Detecting…";
+        document.getElementById("rescard").style.display = "block";
+        document.getElementById("spin").classList.add("show");
+
+        const form = new FormData();
+        form.append("file", curFile);
+        try {
+          const r = await fetch(
+            `/detect/image?confidence=${conf}&return_image=true`,
+            { method: "POST", body: form },
+          );
+          if (!r.ok) {
+            const e = await r.json();
+            throw new Error(e.detail || "Error");
+          }
+          const data = await r.json();
+          renderStats(data);
+          renderDets(data.detections);
+          if (data.annotated_image_b64)
+            document.getElementById("resimg").src =
+              "data:image/jpeg;base64," + data.annotated_image_b64;
+          toast(
+            `${data.total_detections} vehicles found in ${data.inference_time_ms}ms`,
+            "ok",
+          );
+        } catch (e) {
+          toast("Error: " + e.message, "err");
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "<span>🔍</span> DETECT VEHICLES";
+          document.getElementById("spin").classList.remove("show");
+        }
+      }
+
+      function renderStats(data) {
+        const max = Math.max(...Object.values(data.class_counts), 1);
+        document.getElementById("stats").innerHTML = `
+    <div class="sg">
+      <div class="sc"><div class="v">${data.total_detections}</div><div class="l">Vehicles Found</div></div>
+      <div class="sc"><div class="v">${data.inference_time_ms}ms</div><div class="l">Inference Time</div></div>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:9px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">BY CLASS</div>
+      <div class="bl">
+        ${Object.entries(data.class_counts)
+          .map(
+            ([c, n]) => `
+          <div class="br">
+            <span class="bn">${c}</span>
+            <div class="bb"><div class="bf" style="width:${(n / max) * 100}%;background:${COLORS[c] || "#888"}"></div></div>
+            <span class="bv">${n}</span>
+          </div>`,
+          )
+          .join("")}
+      </div>
+    </div>`;
+      }
+
+      function renderDets(dets) {
+        document.getElementById("detbadge").textContent = dets.length;
+        document.getElementById("detlist").innerHTML = dets
+          .map(
+            (d) => `
+    <div class="di2">
+      <div class="dd" style="background:${COLORS[d.class_name] || "#888"}"></div>
+      <span class="dn">${d.class_name}</span>
+      <span class="dp">[${d.bbox.x1},${d.bbox.y1}]</span>
+      <span class="dc">${(d.confidence * 100).toFixed(1)}%</span>
+    </div>`,
+          )
+          .join("");
+        document.getElementById("detcard").style.display = dets.length
+          ? "block"
+          : "none";
+      }
+
+      // Video
+      let vFile = null;
+      let lineChartInst = null,
+        barChartInst = null;
+      function onVideo(e) {
+        vFile = e.target.files[0];
+        if (vFile) document.getElementById("vbtn").disabled = false;
+        // Reset dashboard
+        document.getElementById("vdashboard").style.display = "none";
+      }
+
+      async function doVideo() {
+        if (!vFile) return;
+        const btn = document.getElementById("vbtn");
+        btn.disabled = true;
+        btn.textContent = "Processing…";
+        document.getElementById("vspin").classList.add("show");
+        document.getElementById("vdashboard").style.display = "none";
+
+        const frames = document.getElementById("fslide").value;
+        const form = new FormData();
+        form.append("file", vFile);
+        try {
+          const r = await fetch(`/detect/video?max_frames=${frames}`, {
+            method: "POST",
+            body: form,
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.detail);
+
+          // Show dashboard
+          document.getElementById("vdashboard").style.display = "block";
+
+          // ── Traffic Report Summary ──
+          const congEmoji =
+            data.overall_congestion === "HIGH"
+              ? "🔴"
+              : data.overall_congestion === "MODERATE"
+                ? "🟡"
+                : "🟢";
+          const congClass =
+            data.overall_congestion === "HIGH"
+              ? "hl-red"
+              : data.overall_congestion === "MODERATE"
+                ? "hl-orange"
+                : "hl-green";
+          const topType = Object.entries(data.class_totals || {}).sort(
+            (a, b) => b[1] - a[1],
+          )[0];
+          const peak = data.peak_traffic;
+          const videoDuration = data.frame_data?.length
+            ? data.frame_data[data.frame_data.length - 1].time_sec
+            : 0;
+
+          document.getElementById("report-card").innerHTML = `
+            <div class="report-title">📋 Traffic Analysis Report</div>
+            <div class="report-text">
+              ${congEmoji} <strong>Overall Traffic Level:</strong> <span class="highlight ${congClass}">${data.overall_congestion}</span><br>
+              🎞️ Analyzed <strong>${data.frames_processed} frames</strong> (${videoDuration}s of video)<br>
+              🚗 Found <strong>${data.total_detections} total vehicles</strong> across all frames (average <strong>${data.avg_detections_per_frame}</strong> vehicles per frame)<br>
+              ${topType ? `🏆 Most common vehicle: <strong>${topType[0]}</strong> (${topType[1]} detected)<br>` : ""}
+              ⚡ Busiest moment was at <strong>${peak.time_sec}s</strong> (Frame #${peak.frame}) with <strong>${peak.vehicle_count} vehicles</strong> on screen<br>
+              ⏱️ Average processing speed: <strong>${data.avg_inference_ms}ms</strong> per frame
+            </div>
+          `;
+
+          // ── Stats row ──
+          document.getElementById("vstats-row").innerHTML = `
+      <div class="vstat-card"><div class="v">${data.frames_processed}</div><div class="l">Frames Analyzed</div><div class="sub">Video frames scanned</div></div>
+      <div class="vstat-card"><div class="v">${data.total_detections}</div><div class="l">Total Vehicles</div><div class="sub">Sum across all frames</div></div>
+      <div class="vstat-card"><div class="v">${data.avg_detections_per_frame}</div><div class="l">Avg Per Frame</div><div class="sub">Vehicles visible per frame</div></div>
+      <div class="vstat-card"><div class="v">${data.avg_inference_ms}ms</div><div class="l">Processing Speed</div><div class="sub">Time to analyze each frame</div></div>`;
+
+          // ── Download link + Video Player + overall congestion badge ──
+          const dl = document.getElementById("vdl");
+          dl.href = data.output_url;
+          dl.style.display = "inline-flex";
+
+          const player = document.getElementById("vplayer");
+          player.src = data.output_url;
+          document.getElementById("vplayer-card").style.display = "flex";
+
+          document.getElementById("overall-badge").innerHTML =
+            `<span class="cong-badge cong-${data.overall_congestion}">${congEmoji} Overall: ${data.overall_congestion} Congestion</span>`;
+
+          // ── Line Chart: vehicles per frame ──
+          if (lineChartInst) lineChartInst.destroy();
+          const fd = data.frame_data || [];
+          const labels = fd.map((f) => f.time_sec + "s");
+          const counts = fd.map((f) => f.vehicle_count);
+          // Color points by congestion level
+          const pointColors = fd.map((f) =>
+            f.congestion === "HIGH"
+              ? "#ff3b5c"
+              : f.congestion === "MODERATE"
+                ? "#ff9500"
+                : "#00e5a0",
+          );
+
+          lineChartInst = new Chart(document.getElementById("lineChart"), {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "Vehicles",
+                  data: counts,
+                  borderColor: "#00e5a0",
+                  backgroundColor: (ctx) => {
+                    const canvas = ctx.chart.ctx;
+                    const gradient = canvas.createLinearGradient(0, 0, 0, 200);
+                    gradient.addColorStop(0, "rgba(0, 229, 160, 0.4)");
+                    gradient.addColorStop(1, "rgba(0, 229, 160, 0.0)");
+                    return gradient;
+                  },
+                  fill: true,
+                  tension: 0.45,
+                  pointRadius: 2,
+                  pointHoverRadius: 5,
+                  pointBackgroundColor: pointColors,
+                  pointBorderColor: pointColors,
+                  borderWidth: 2,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 1500, easing: "easeOutQuart" },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: "rgba(22, 27, 36, 0.9)",
+                  borderColor: "rgba(0, 229, 160, 0.5)",
+                  borderWidth: 1,
+                  titleColor: "#dde4f0",
+                  bodyColor: "#00e5a0",
+                  padding: 10,
+                  cornerRadius: 8,
+                  callbacks: {
+                    afterBody: function (ctx) {
+                      const idx = ctx[0].dataIndex;
+                      return "🚦 Level: " + fd[idx].congestion;
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  grid: { color: "rgba(255,255,255,.03)", drawBorder: false },
+                  ticks: {
+                    color: "#6b7a96",
+                    font: { size: 9, family: "'JetBrains Mono', monospace" },
+                    maxTicksLimit: 12,
+                  },
+                  title: {
+                    display: true,
+                    text: "Time (Seconds)",
+                    color: "#6b7a96",
+                    font: { size: 10, family: "'Syne', sans-serif" },
+                  },
+                },
+                y: {
+                  grid: { color: "rgba(255,255,255,.05)", borderDash: [5, 5] },
+                  ticks: {
+                    color: "#6b7a96",
+                    font: { size: 9, family: "'JetBrains Mono', monospace" },
+                  },
+                  title: {
+                    display: true,
+                    text: "Vehicles Count",
+                    color: "#6b7a96",
+                    font: { size: 10, family: "'Syne', sans-serif" },
+                  },
+                  beginAtZero: true,
+                  suggestedMax: 25,
+                },
+              },
+              annotation: {},
+            },
+            plugins: [
+              {
+                id: "thresholdLines",
+                afterDraw(chart) {
+                  const ctx2 = chart.ctx;
+                  const yScale = chart.scales.y;
+                  // Draw MODERATE threshold at 10
+                  const y10 = yScale.getPixelForValue(10);
+                  if (
+                    y10 >= chart.chartArea.top &&
+                    y10 <= chart.chartArea.bottom
+                  ) {
+                    ctx2.save();
+                    ctx2.strokeStyle = "rgba(255,149,0,.4)";
+                    ctx2.lineWidth = 1;
+                    ctx2.setLineDash([5, 5]);
+                    ctx2.beginPath();
+                    ctx2.moveTo(chart.chartArea.left, y10);
+                    ctx2.lineTo(chart.chartArea.right, y10);
+                    ctx2.stroke();
+                    ctx2.fillStyle = "rgba(255,149,0,.6)";
+                    ctx2.font = "9px JetBrains Mono";
+                    ctx2.fillText(
+                      "MODERATE (10)",
+                      chart.chartArea.left + 4,
+                      y10 - 4,
+                    );
+                    ctx2.restore();
+                  }
+                  // Draw HIGH threshold at 20
+                  const y20 = yScale.getPixelForValue(20);
+                  if (
+                    y20 >= chart.chartArea.top &&
+                    y20 <= chart.chartArea.bottom
+                  ) {
+                    ctx2.save();
+                    ctx2.strokeStyle = "rgba(255,59,92,.4)";
+                    ctx2.lineWidth = 1;
+                    ctx2.setLineDash([5, 5]);
+                    ctx2.beginPath();
+                    ctx2.moveTo(chart.chartArea.left, y20);
+                    ctx2.lineTo(chart.chartArea.right, y20);
+                    ctx2.stroke();
+                    ctx2.fillStyle = "rgba(255,59,92,.6)";
+                    ctx2.font = "9px JetBrains Mono";
+                    ctx2.fillText(
+                      "HIGH (20)",
+                      chart.chartArea.left + 4,
+                      y20 - 4,
+                    );
+                    ctx2.restore();
+                  }
+                },
+              },
+            ],
+          });
+
+          // ── Bar Chart: vehicle type distribution ──
+          if (barChartInst) barChartInst.destroy();
+          const dist =
+            data.vehicle_type_distribution || data.class_totals || {};
+          const typeLabels = Object.keys(dist);
+          const typeValues = Object.values(dist);
+          const typeColors = typeLabels.map((l) => COLORS[l] || "#888");
+
+          const emojiMap = {
+            car: "🚗",
+            truck: "🚛",
+            bus: "🚌",
+            motorcycle: "🏍️",
+            bicycle: "🚲",
+          };
+          const totalVehicles =
+            Object.values(dist).reduce((a, b) => a + b, 0) || 1;
+
+          barChartInst = new Chart(document.getElementById("barChart"), {
+            type: "bar",
+            data: {
+              labels: typeLabels.map(
+                (l) =>
+                  (emojiMap[l.toLowerCase()] || "🚙") +
+                  " " +
+                  l.charAt(0).toUpperCase() +
+                  l.slice(1),
+              ),
+              datasets: [
+                {
+                  label: "Count",
+                  data: typeValues,
+                  backgroundColor: typeColors.map((c) => c + "dd"),
+                  borderColor: typeColors,
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  borderSkipped: false,
+                  hoverBackgroundColor: typeColors,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 1500, easing: "easeOutBounce" },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: "rgba(22, 27, 36, 0.9)",
+                  titleColor: "#dde4f0",
+                  bodyColor: "#fff",
+                  padding: 10,
+                  cornerRadius: 8,
+                  callbacks: {
+                    label: function (ctx) {
+                      const val = ctx.raw;
+                      const pct = Math.round((val / totalVehicles) * 100);
+                      return `Count: ${val} (${pct}%)`;
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  grid: { display: false },
+                  ticks: {
+                    color: "#dde4f0",
+                    font: { size: 11, family: "'Syne', sans-serif" },
+                  },
+                },
+                y: {
+                  grid: { color: "rgba(255,255,255,.05)", borderDash: [5, 5] },
+                  ticks: {
+                    color: "#6b7a96",
+                    font: { size: 9, family: "'JetBrains Mono', monospace" },
+                  },
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: "Total Found",
+                    color: "#6b7a96",
+                    font: { size: 10 },
+                  },
+                },
+              },
+            },
+          });
+
+          // ── Peak traffic moment (reuse peak from above) ──
+          document.getElementById("peak-body").innerHTML = `
+      <div class="peak-card">
+        <div class="peak-val">${peak.vehicle_count}</div>
+        <div class="peak-sub">Max Vehicles at Once</div>
+        <div class="peak-time">⏱ At <strong>${peak.time_sec} seconds</strong> into the video</div>
+        <div style="font-size:10px;color:var(--muted2);margin-top:4px">(Frame #${peak.frame})</div>
+        <div style="margin-top:10px"><span class="cong-badge cong-${peak.congestion}">${peak.congestion} congestion at this moment</span></div>
+        ${
+          Object.keys(peak.class_counts || {}).length
+            ? `
+        <div style="margin-top:12px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
+          ${Object.entries(peak.class_counts)
+            .map(
+              ([c, n]) => `
+            <span style="font-size:10px;color:${COLORS[c] || "#888"};background:rgba(255,255,255,.05);padding:3px 8px;border-radius:4px">${c}: ${n}</span>
+          `,
+            )
+            .join("")}
+        </div>`
+            : ""
+        }
+        <div class="section-desc" style="text-align:left">
+          📌 This shows the <em>single busiest moment</em> in your video — the frame where the most vehicles appeared simultaneously.
+        </div>
+      </div>`;
+
+          // ── Congestion timeline ──
+          const tl = data.congestion_timeline || [];
+          const totalSec = fd.length ? fd[fd.length - 1].time_sec : 1;
+          const tlBarHTML = tl
+            .map((s) => {
+              const dur = s.end_sec - s.start_sec;
+              const pct = Math.max((dur / totalSec) * 100, 2);
+              return `<div class="tl-seg ${s.level}" style="width:${pct}%" title="${s.level}: ${s.start_sec}s—${s.end_sec}s">${dur > 1 ? s.level.charAt(0) : ""}</div>`;
+            })
+            .join("");
+
+          const tlLegend = tl
+            .map(
+              (s) => `
+      <div class="tl-item">
+        <div class="tl-dot" style="background:${s.level === "HIGH" ? "#ff3b5c" : s.level === "MODERATE" ? "#ff9500" : "#00e5a0"}"></div>
+        <span>${s.start_sec}s — ${s.end_sec}s : <strong style="color:${s.level === "HIGH" ? "#ff3b5c" : s.level === "MODERATE" ? "#ff9500" : "#00e5a0"}">${s.level}</strong></span>
+      </div>
+    `,
+            )
+            .join("");
+
+          document.getElementById("timeline-body").innerHTML = `
+      <div class="tl-bar">${tlBarHTML}</div>
+      <div class="tl-legend">${tlLegend}</div>
+      <div class="section-desc">
+        📌 This bar shows <em>how congestion changed over time</em> throughout your video.
+        <span style="color:#00e5a0">Green = LOW</span> (road is clear),
+        <span style="color:#ff9500">Orange = MODERATE</span> (getting busy),
+        <span style="color:#ff3b5c">Red = HIGH</span> (heavy traffic).
+        Each segment shows a period where the congestion level stayed the same.
+      </div>`;
+
+          toast("Video processed — Dashboard ready!", "ok");
+        } catch (e) {
+          toast("Error: " + e.message, "err");
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = "<span>▶</span> PROCESS VIDEO";
+          document.getElementById("vspin").classList.remove("show");
+        }
+      }
+
+      function toast(msg, type) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.className = `toast ${type} show`;
+        setTimeout(() => t.classList.remove("show"), 3500);
+      }
+    </script>
+  </body>
+</html>
