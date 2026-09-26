@@ -156,7 +156,7 @@ traffic-detection/
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/vehicleeye.git
+git clone https://github.com/isha-sarwar19/Traffic-Detection-System.git
 cd vehicleeye
 ```
 
